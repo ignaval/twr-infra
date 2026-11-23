@@ -109,6 +109,10 @@ run "defaults" {
     error_message = "the pinned twr tag and the ACME contact reach cloud-init"
   }
   assert {
+    condition     = strcontains(local.user_data["eu"], "--install --no-start") && strcontains(local.user_data["eu"], "systemctl start twr-relay.service")
+    error_message = "the relay starts only after its names resolve"
+  }
+  assert {
     condition     = length(local.user_data["eu"]) < 48 * 1024
     error_message = "cloud-init stays well under the 64 KiB user_data limit"
   }

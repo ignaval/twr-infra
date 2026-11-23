@@ -126,13 +126,21 @@ runcmd:
   - [systemctl, try-reload-or-restart, ssh.service]
   # twr from the pinned, signed release, then the relay service. A failed check stops here:
   # nothing unverified is installed, and `cloud-init status` reports the error.
+  # The service starts once the relay's names resolve (at most an hour's wait): an ACME
+  # attempt before DNS works fails, counts against Let's Encrypt's failed-validation limit
+  # (5 per name an hour) and backs the relay's retries off for up to 18 hours.
   - - sh
     - -c
     - >-
       set -eu;
       sh /usr/local/share/twr-infra/install-twr-release.sh --tag "$1"
       --key /usr/local/share/twr-infra/twr-release-signing-key.pub --dest /usr/local/bin;
-      /usr/local/bin/twr relay serve --install --hostname "$2" --region "$3" --acme-contact "$4"
+      /usr/local/bin/twr relay serve --install --no-start --hostname "$2" --region "$3" --acme-contact "$4";
+      i=0;
+      until getent ahostsv4 "$2" > /dev/null && getent ahostsv4 "iroh.$2" > /dev/null; do
+      i=$((i + 1)); if [ "$i" -ge 360 ]; then echo "twr-relay-bootstrap: $2 doesn't resolve yet, starting anyway" >&2; break; fi;
+      sleep 10; done;
+      systemctl start twr-relay.service
     - twr-relay-bootstrap
     - "${twr_version}"
     - "${hostname}"
