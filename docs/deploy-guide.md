@@ -647,10 +647,16 @@ These were checked offline only, or not at all:
 - Vercel accepting NS records for `relay` (its docs list the type; I didn't try it).
 - `api.ipify.org` giving the runner's address, and the firewall API's behaviour. Step 21 tests both from your machine, and step 23 tests them from a runner.
 - The `cloud-init` package on GitHub's `ubuntu-24.04` runner (`plan.yml` installs it if missing).
-- Everything on a real Droplet: Ubuntu 26.04's `ssh.service` name, chrony, nftables with conntrack. On this machine `nft -c` parsed the rules, but the conntrack lines couldn't be checked without root.
+- A real Droplet's first boot: cloud-init itself, Ubuntu 26.04's `ssh.service` name, chrony, and nftables with conntrack. On this machine `nft -c` parsed the rules, but the conntrack lines couldn't be checked without root. The container test covers the deploy path, not cloud-init.
 
 What was tested offline, 2026-11-23:
 
 - `tofu fmt`, `tofu validate`, and `tofu test`: 7 runs on a mocked provider, covering Droplets, records, CAA, firewall rules, reserved IPs, cloud-init per region, and refusals of bad input.
 - `cloud-init schema` on both regions' rendered user data, and an `sshd -t` check of the SSH drop-in.
 - shellcheck, actionlint, the installer's and the alert script's own tests, and `twr relay check-config` on both region configs.
+- The Droplet side of a deploy, in an Ubuntu 26.04 container with systemd (`scripts/test-droplet-container.sh`):
+  - the first deploy, with the service running as `twr-relay`, the monitoring timers active and `twr relay probe` passing;
+  - a second deploy;
+  - a config `twr` refuses, which changes nothing;
+  - a crashing release, which rolls back;
+  - no addresses in the journal.
