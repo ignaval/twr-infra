@@ -54,17 +54,7 @@ New Droplets get their first twr from cloud-init, with the `twr_version` tofu va
 
 ## One-time setup, in order
 
-1. Do every item of the checklist below up to "SSH keys".
-2. Fill in the open pins: `TOFU_VERSION` and `TOFU_SHA256` in `plan.yml`, and the slugs in `tofu/variables.tf` once checked.
-3. `cp tofu/terraform.tfvars.example tofu/terraform.tfvars` and fill it in. It is ignored by git.
-4. Run `export DIGITALOCEAN_TOKEN=...` (from your password manager, never a file here), then `tofu -chdir=tofu init`, and commit `tofu/.terraform.lock.hcl`.
-5. Run `tofu -chdir=tofu plan`, read it, then `tofu -chdir=tofu apply`.
-6. Add the delegation NS records (`tofu output delegation_ns_records`) in the `twr.tools` zone, and wait until `dig NS relay.twr.tools` shows DigitalOcean's servers.
-7. On each Droplet the relay gets its certificate once DNS resolves. Check with `twr relay probe relay://eu.relay.twr.tools`.
-8. Pin each Droplet's host key in `known_hosts` (`docs/runbook.md`, "Host keys") and commit.
-9. Set `DO_FIREWALL_ID` (`tofu output firewall_id`) and `TWR_PROBE_VERSION` as repository variables.
-10. Run `deploy` once with the same tag. That installs monitoring and the alert routes, which cloud-init doesn't.
-11. Send a test alert: `sudo /usr/local/lib/twr-relay-monitor/alert.sh --test` on a Droplet.
+[docs/deploy-guide.md](docs/deploy-guide.md) walks from no accounts to both regions passing `twr relay probe`, step by step, with what to check after each and who can do it. It also covers the first deploy, rollback and teardown. The checklist below is the short form.
 
 ## Checklist: what a human has to set up
 
@@ -79,7 +69,7 @@ None of this exists yet, and I verified none of it. The repository works only af
 
 **DNS**
 - [ ] Find out where `twr.tools` DNS lives today. It is unknown. twr's `docs/development.md` says only that `twr.tools` is a Vercel project. Check the Vercel dashboard (Domains), `vercel domains inspect twr.tools`, or the registrar's panel.
-- [ ] In that zone, add three NS records for `relay.twr.tools` pointing at `ns1.digitalocean.com.`, `ns2.digitalocean.com.` and `ns3.digitalocean.com.`. This repository doesn't manage them. If Vercel hosts the zone, *unverified* that it allows NS records for a subdomain.
+- [ ] After `tofu` has created the `relay.twr.tools` zone (never before: a delegation to an unclaimed DigitalOcean zone can be taken over), in the parent zone add three NS records for `relay.twr.tools` pointing at `ns1.digitalocean.com.`, `ns2.digitalocean.com.` and `ns3.digitalocean.com.`. This repository doesn't manage them. If Vercel hosts the zone, *unverified* that it allows NS records for a subdomain.
 - [ ] If the parent zone has a CAA record, make sure it allows `letsencrypt.org`. `relay.twr.tools` gets its own CAA records from `tofu/dns.tf`.
 
 **Mail**
@@ -87,7 +77,7 @@ None of this exists yet, and I verified none of it. The repository works only af
 
 **GitHub**
 - [ ] A private repository for this one, for example `ignaval/twr-infra`. I created none and pushed nothing.
-- [ ] An environment `relay-deploy` with you as required reviewer, limited to the `main` branch, with these secrets:
+- [ ] An environment `relay-deploy` limited to the `main` branch, with you as required reviewer. The reviewer is available only for a public repository, or a private one on Enterprise (deploy guide, 0.3). It holds these secrets:
   - `DEPLOY_SSH_KEY`: the deploy user's private key (OpenSSH format, ed25519, no passphrase; a runner can't use a hardware key).
   - `DO_FIREWALL_TOKEN`: the firewall-only token above.
   - Alert routes, optional. If any is set, every deploy writes them to `/etc/twr-relay/alert.env`. They are `ALERT_WEBHOOK_URL`, `ALERT_WEBHOOK_TOKEN`, `ALERT_SMTP_URL`, `ALERT_SMTP_USER`, `ALERT_SMTP_PASSWORD`, `ALERT_EMAIL_FROM` and `ALERT_EMAIL_TO`.
@@ -111,17 +101,24 @@ None of this exists yet, and I verified none of it. The repository works only af
 
 ## Things I could not verify
 
-- The Droplet size slug `s-1vcpu-1gb` and the image slug `ubuntu-26-04-x64`.
-- The `digitalocean` provider version range `~> 2.40`. `.terraform.lock.hcl` will hold the real pin.
-- `TOFU_VERSION` `1.10.7`, and that its release has a `tofu_<v>_linux_amd64.tar.gz` asset. `TOFU_SHA256` is `REPLACE_ME`, so `plan.yml`'s tofu job fails until someone fills it in.
-- The `twr relay` subcommands, flags, metrics and JSON fields. They come from the interface the relay's author gave and are being written in parallel. In particular the probe's `checks[].name` values are unknown.
-- How DigitalOcean treats `*.eu` wildcard records and the CAA value format.
-- The DigitalOcean firewall rules API (`POST` and `DELETE /v2/firewalls/<id>/rules`), and the token scope it needs.
+Checked on 2026-11-23, offline: `tofu fmt`, `tofu validate` and `tofu test` with OpenTofu 1.13.9 and the provider at 2.109.0, the rendered cloud-init against `cloud-init schema`, the sshd drop-in with `sshd -t`, and the nftables rules with `nft -c`, except the conntrack lines, which need root. Not checked, because that needs the real services:
+
+- The Droplet size slug `s-1vcpu-1gb` and the image slug `ubuntu-26-04-x64`. The deploy guide's step 2 checks both with the new token.
+- The token scopes the provider needs, and the scope of the firewall-rules endpoints (`POST` and `DELETE /v2/firewalls/<id>/rules`). DigitalOcean's docs don't say; the guide's steps 2 and 21 find out.
+- Where `twr.tools` DNS lives, and that its host takes NS records for `relay`. Vercel's docs list NS as "Delegate a subdomain"; its CLI documents no NS type.
+- How DigitalOcean treats the `*.eu` wildcard records and the CAA value format.
 - That `api.ipify.org` gives the runner's egress address.
-- That the Ubuntu 26.04 image has the `ssh.service` name, chrony through cloud-init's `ntp` module, and an OpenSSL of version 3 or newer. That last one is near certain.
-- That `ubuntu-24.04` runners have shellcheck and PyYAML. twr's own CI relies on shellcheck there.
-- Whether the probe's test hub and pairing admission count against the per-address limits. They might: 10 new hub names and 10 pairing admissions per address per hour, while each Droplet probes the other every minute. If they do, the peer probe will trip the limits. The probe would then need a fixed test identity, an exemption for the peer addresses, or a slower timer. Ask the relay's author before enabling monitoring.
+- On a real Droplet: Ubuntu 26.04's `ssh.service` name, chrony through cloud-init's `ntp` module, and nftables' conntrack rules.
+- That `ubuntu-24.04` runners have shellcheck and PyYAML. They lack `cloud-init`, which `plan.yml` installs.
+- GitHub plans: required reviewers on an environment work in a private repository only on Enterprise. On Pro, a private repository gets environments, their secrets and branch rules, but no reviewer. The guide's 0.3 lays out the choice.
 
 ## Checks
 
-`sh scripts/check.sh` runs everything that needs no network: shellcheck, actionlint, `scripts/check-files.py`, the installer's tests against a fake release signed with a throwaway key, the alert script's tests with a stub `curl`, and `tofu fmt` if tofu is installed. `plan.yml` runs the same, plus `tofu validate`.
+`sh scripts/check.sh` runs everything that needs no network:
+
+- shellcheck, actionlint and `scripts/check-files.py`;
+- the installer's tests, against a fake release signed with a throwaway key;
+- the alert script's tests, with a stub `curl`;
+- `tofu fmt`, if tofu is installed.
+
+Once `tofu -chdir=tofu init -backend=false` has run, it also runs `tofu validate`, `tofu test` (`tofu/tests/relay.tftest.hcl` against a mocked provider: no token, no API call) and `scripts/check-cloud-init.sh`. That script renders each region's user data with `tofu console` and checks it with `cloud-init schema`. `plan.yml` runs all of it.
