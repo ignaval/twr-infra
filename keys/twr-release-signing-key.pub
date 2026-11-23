@@ -1,0 +1,7 @@
+# The Ed25519 public key twr releases are signed with (sha256sums.txt.sig).
+# Copied from the twr repository's release/signing-key.pub, unchanged since commit
+# 49f3edc1e180686bc0c737c21fabd274510f82cd (2026-10-15), read at ecf7eda9 on 2026-11-23.
+# The same key is in twr's install.sh (RELEASE_KEY). OpenSSL ignores these lines.
+-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAoEFCsIDDaJTSlpcteH2pp3aZpLQ+SB+18sUdZNqe9dg=
+-----END PUBLIC KEY-----

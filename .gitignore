@@ -1,0 +1,21 @@
+# OpenTofu state and working files (state is local for now: tofu/versions.tf says why).
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+.terraform/
+crash.log
+crash.*.log
+# Variable values: terraform.tfvars.example is the committed template.
+*.tfvars
+!*.tfvars.example
+*.auto.tfvars.json
+# Env files with secrets (alert routes, tokens). alert.env.example is the template.
+.env
+.env.*
+*.env
+!*.env.example
+# Keys never belong here, except the release public key.
+*.pem
+id_*
+!keys/twr-release-signing-key.pub
