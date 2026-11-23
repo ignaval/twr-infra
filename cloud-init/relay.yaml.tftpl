@@ -1,0 +1,140 @@
+#cloud-config
+# First boot of a twr relay Droplet. Rendered by tofu/main.tf (templatefile) per region.
+# Runs once: later changes reach a running Droplet through the deploy workflow (twr, the
+# relay config, monitoring) or by hand (docs/runbook.md), not through this file.
+#
+# Region ${region}: ${hostname}, twr ${twr_version} at first boot.
+
+hostname: twr-relay-${region}
+timezone: Etc/UTC
+
+# No password logins anywhere over SSH; no root over SSH.
+ssh_pwauth: false
+disable_root: true
+
+users:
+  - name: ${admin_user}
+    gecos: twr relay admin
+    groups: [sudo]
+    shell: /bin/bash
+    lock_passwd: true
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys: ${jsonencode(admin_ssh_public_keys)}
+  # The deploy workflow's login. Root-equivalent (it installs twr and restarts the relay);
+  # its key lives only in the relay-deploy GitHub environment, behind a required reviewer.
+  - name: deploy
+    gecos: twr-infra deploy workflow
+    shell: /bin/sh
+    lock_passwd: true
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys: ${jsonencode([deploy_ssh_public_key])}
+
+# Time sync with the distribution's default client (chrony on recent Ubuntu releases).
+ntp:
+  enabled: true
+
+package_update: true
+package_upgrade: true
+packages:
+  - ca-certificates
+  - curl
+  - nftables
+  - openssl
+  - python3
+  - unattended-upgrades
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/10-twr-relay.conf
+    permissions: "0644"
+    content: |
+      # twr relay (cloud-init). sshd keeps the first value it reads, and this file comes
+      # before 50-cloud-init.conf.
+      PermitRootLogin no
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      AuthenticationMethods publickey
+      AllowUsers ${admin_user} deploy
+      X11Forwarding no
+      AllowAgentForwarding no
+      AllowTcpForwarding no
+
+  # Security updates every day; a reboot, when one is needed, at this region's own time so
+  # that the two regions are never down together.
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    permissions: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+  - path: /etc/apt/apt.conf.d/52twr-relay-unattended-upgrades
+    permissions: "0644"
+    content: |
+      // twr relay (cloud-init). The default Allowed-Origins (security pockets) stay as they are.
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "${reboot_time}";
+      Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+      Unattended-Upgrade::Remove-Unused-Dependencies "true";
+
+  # The second firewall layer, behind DigitalOcean's cloud firewall (tofu/main.tf).
+  - path: /etc/nftables.conf
+    permissions: "0644"
+    content: |
+      #!/usr/sbin/nft -f
+      # twr relay (cloud-init): SSH, the relay on TCP 443, iroh's QUIC address discovery on
+      # UDP 7842. Everything else inbound is dropped.
+      flush ruleset
+
+      table inet filter {
+        chain input {
+          type filter hook input priority filter; policy drop;
+          ct state established,related accept
+          ct state invalid drop
+          iif "lo" accept
+          meta l4proto icmp accept
+          meta l4proto ipv6-icmp accept
+          tcp dport { 22, 443 } accept
+          udp dport 7842 accept
+        }
+        chain forward {
+          type filter hook forward priority filter; policy drop;
+        }
+        chain output {
+          type filter hook output priority filter; policy accept;
+        }
+      }
+
+  # The installer and the key it checks releases with: the same files as in the repository.
+  - path: /usr/local/share/twr-infra/install-twr-release.sh
+    permissions: "0755"
+    encoding: b64
+    content: ${base64encode(install_script)}
+  - path: /usr/local/share/twr-infra/twr-release-signing-key.pub
+    permissions: "0644"
+    encoding: b64
+    content: ${base64encode(signing_key)}
+
+  # This region's relay.toml (config/${region}.toml). `twr relay serve --install` keeps an
+  # existing file, so this is the config the relay starts with.
+  - path: /etc/twr-relay/relay.toml
+    permissions: "0644"
+    encoding: b64
+    content: ${base64encode(relay_config)}
+
+runcmd:
+  - [systemctl, enable, --now, nftables.service]
+  - [systemctl, try-reload-or-restart, ssh.service]
+  # twr from the pinned, signed release, then the relay service. A failed check stops here:
+  # nothing unverified is installed, and `cloud-init status` reports the error.
+  - - sh
+    - -c
+    - >-
+      set -eu;
+      sh /usr/local/share/twr-infra/install-twr-release.sh --tag "$1"
+      --key /usr/local/share/twr-infra/twr-release-signing-key.pub --dest /usr/local/bin;
+      /usr/local/bin/twr relay serve --install --hostname "$2" --region "$3" --acme-contact "$4"
+    - twr-relay-bootstrap
+    - "${twr_version}"
+    - "${hostname}"
+    - "${region}"
+    - "${acme_contact}"

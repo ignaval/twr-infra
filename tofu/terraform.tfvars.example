@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars (ignored by git) and fill in. Public values only: no tokens here.
+# The DigitalOcean token comes from the environment, DIGITALOCEAN_TOKEN.
+
+twr_version = "REPLACE_ME" # a released tag, for example v0.8.0
+
+admin_ssh_public_keys = [
+  "REPLACE_ME sk-ssh-ed25519@openssh.com AAAA... ops@hardware-key",
+]
+
+deploy_ssh_public_key = "REPLACE_ME ssh-ed25519 AAAA... twr-infra-deploy"
+
+# admin_ssh_cidrs = ["203.0.113.7/32"] # your address, only while you need SSH
+# use_reserved_ips = true
+# droplet_image = "ubuntu-26-04-x64" # check: doctl compute image list-distribution
