@@ -6,7 +6,8 @@
 #   (files)      scripts/check-files.py: TOML configs against the relay's schema, YAML of the
 #                workflows, the rendered cloud-init template, known_hosts, no secrets
 #   (tests)      the installer's and alert.sh's offline tests
-#   (tofu fmt)   only where tofu is installed
+#   (tofu)       fmt where tofu is installed; validate, test (mocked provider) and the
+#                cloud-init schema of the rendered user_data once `tofu init` has run
 #
 # A missing optional tool is reported as SKIPPED; with CHECK_STRICT=1 (CI) it fails instead.
 # ACTIONLINT and SHELLCHECK may name the binaries. Exit status 1 if anything failed.
@@ -84,6 +85,19 @@ run test-alert sh monitoring/test-alert.sh
 
 if command -v tofu > /dev/null 2>&1; then
     run tofu-fmt tofu fmt -check -recursive -diff tofu
+    # validate, test and the rendered cloud-init need the provider plugin: `tofu init`.
+    if [ -d tofu/.terraform ]; then
+        run tofu-validate tofu -chdir=tofu validate -no-color
+        run tofu-test tofu -chdir=tofu test -no-color
+        if command -v cloud-init > /dev/null 2>&1; then
+            run cloud-init-schema sh scripts/check-cloud-init.sh
+        else
+            skip cloud-init-schema "cloud-init is not installed; plan.yml runs it"
+        fi
+    else
+        echo "== tofu-validate, tofu-test, cloud-init-schema: SKIPPED (run tofu -chdir=tofu init -backend=false first)"
+        skipped="$skipped tofu-validate tofu-test cloud-init-schema"
+    fi
 else
     echo "== tofu-fmt: SKIPPED (tofu is not installed; plan.yml runs it)"
     skipped="$skipped tofu-fmt"

@@ -170,7 +170,7 @@ def check_cloud_init():
     print(f"cloud-init: {tpl_path.relative_to(ROOT)}")
     tpl = tpl_path.read_text()
     main = (ROOT / "tofu" / "main.tf").read_text()
-    m = re.search(r"templatefile\(\"\$\{path\.module\}/\.\./cloud-init/relay\.yaml\.tftpl\", \{(.*?)\n  \}\)", main, re.S)
+    m = re.search(r"templatefile\(\"\$\{path\.module\}/\.\./cloud-init/relay\.yaml\.tftpl\", \{(.*?)\n\s*\}\)", main, re.S)
     if not m:
         error("tofu/main.tf: no templatefile() call for cloud-init/relay.yaml.tftpl")
         return
@@ -191,7 +191,7 @@ def check_cloud_init():
         }
         for k, fm in files.items():
             if fm:
-                rel = fm.group(1).replace("${each.key}", region)
+                rel = fm.group(1).replace("${each.key}", region).replace("${r}", region)
                 values[k] = (ROOT / rel).read_text()
 
         def sub(mm):

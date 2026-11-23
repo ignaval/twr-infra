@@ -9,6 +9,8 @@ crash.*.log
 # Variable values: terraform.tfvars.example is the committed template.
 *.tfvars
 !*.tfvars.example
+# Placeholder values for the offline checks (public test keys only).
+!tofu/tests/check.tfvars
 *.auto.tfvars.json
 # Env files with secrets (alert routes, tokens). alert.env.example is the template.
 .env
