@@ -47,7 +47,9 @@ for peer in $PEERS; do
     url="relay://$peer.$domain"
     out="$state/peer-$peer.json"
     count_file="$state/peer-$peer.fails"
-    if "$twr" relay probe "$url" --json --timeout "$timeout" > "$out" 2> "$state/peer-$peer.err"; then
+    # --state: the same probe keys every minute, so the peer sees one hub and one admitted
+    # pair, within its per-address limits (twr's docs/relay.md, Monitoring).
+    if "$twr" relay probe "$url" --json --timeout "$timeout" --state "$state/probe-keys-$peer" > "$out" 2> "$state/peer-$peer.err"; then
         rm -f "$count_file"
         "$lib/alert.sh" "peer-$peer" ok "$region: the relay at $url answers the probe again" || true
         continue

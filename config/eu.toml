@@ -36,6 +36,7 @@ enabled = true
 # Covered by the *.eu.relay.twr.tools DNS records; the relay gets its certificate itself.
 hostname = "iroh.eu.relay.twr.tools"
 # iroh's QUIC address discovery. Matches the UDP 7842 firewall rules (tofu/, cloud-init/).
+quic = true
 quic_listen = "[::]:7842"
 
 [limits]
@@ -65,6 +66,11 @@ max_records = 100000
 max_admitted = 200000
 # Record store: records expire 2 hours after they were stored.
 record_ttl_seconds = 7200
+# The other region's addresses, which probe this one every minute
+# (monitoring/peer-probe.sh). Fill in after the first `tofu apply` (tofu output), IPv4 and the
+# IPv6 /64. With --state the probe stays inside the per-address limits anyway; this keeps a
+# burst of retries from tripping them. The deny list still applies to these.
+exempt_addresses = []
 
 [deny]
 # Abuse response (docs/runbook.md, "Abuse"). Each entry with a dated comment saying why.

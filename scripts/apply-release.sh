@@ -74,6 +74,15 @@ fi
 sh "$share/install-twr-release.sh" --tag "$tag" --key "$share/twr-release-signing-key.pub" \
     --from-dir "$bundle/release" --dest /usr/local/bin
 install -m 0644 "$bundle/relay.toml" "$conf.new"
+# The new twr reads the new file exactly as `serve` will, before anything restarts.
+if ! "$bin" relay check-config "$conf.new"; then
+    say "error: the new twr refuses $bundle/relay.toml; putting the previous twr back"
+    rm -f "$conf.new"
+    if [ -n "$had_prev" ]; then
+        mv -f "$bin.prev" "$bin"
+    fi
+    exit 1
+fi
 mv -f "$conf.new" "$conf"
 
 # 4. `--install` keeps an existing relay.toml, so the file above is the one it uses.

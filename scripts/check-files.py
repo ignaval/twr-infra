@@ -40,14 +40,14 @@ SCHEMA = {
     "relay": {"hostname", "public_host", "public_port", "region", "listen", "state_dir",
               "metrics_listen", "metrics_public", "phone_suffixes"},
     "tls": {"mode", "acme_contact", "acme_directory", "acme_ca_roots", "cert", "key"},
-    "iroh": {"enabled", "hostname", "quic_listen", "listen"},
+    "iroh": {"enabled", "hostname", "quic", "quic_listen", "listen"},
     "limits": {"phones_per_hub", "phone_connections_per_hub", "monthly_bytes_per_hub",
                "bytes_per_second", "burst_bytes", "idle_seconds", "hello_seconds",
                "hub_hello_seconds", "new_hubs_per_ip_per_hour",
                "phone_attempts_per_ip_per_minute", "pending_per_ip",
                "record_puts_per_ip_per_minute", "pairing_admissions_per_ip_per_hour",
                "pair_admissions_per_ip_per_hour", "max_connections", "max_hubs", "max_records",
-               "max_admitted", "record_ttl_seconds"},
+               "max_admitted", "record_ttl_seconds", "exempt_addresses"},
     "deny": {"hubs", "endpoints", "addresses"},
 }
 PORT_HUB_KEYS = {"hub", "listen", "public_port", "allow_unauthenticated"}
@@ -93,6 +93,10 @@ def check_config(path):
     for k in sorted(SCHEMA["limits"] - set(limits)):
         error(f"{path.name}: limits.{k} is not written out (every limit is stated explicitly)")
     for k, v in limits.items():
+        if k == "exempt_addresses":
+            if not isinstance(v, list) or not all(isinstance(a, str) for a in v):
+                error(f"{path.name}: limits.exempt_addresses must be a list of addresses or prefixes")
+            continue
         if not isinstance(v, int) or isinstance(v, bool) or v <= 0:
             error(f"{path.name}: limits.{k} must be a positive integer")
     if limits.get("burst_bytes", 65536) < 65536:
