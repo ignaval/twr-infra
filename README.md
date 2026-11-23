@@ -122,3 +122,5 @@ Checked on 2026-11-23, offline: `tofu fmt`, `tofu validate` and `tofu test` with
 - `tofu fmt`, if tofu is installed.
 
 Once `tofu -chdir=tofu init -backend=false` has run, it also runs `tofu validate`, `tofu test` (`tofu/tests/relay.tftest.hcl` against a mocked provider: no token, no API call) and `scripts/check-cloud-init.sh`. That script renders each region's user data with `tofu console` and checks it with `cloud-init schema`. `plan.yml` runs all of it.
+
+`sh scripts/test-droplet-container.sh <twr binary>` tests the Droplet side of a deploy in a local Ubuntu 26.04 container with systemd. `apply-release.sh` installs a release signed with a throwaway key, and the test checks the relay's service and the monitoring timers. It then probes the relay, deploys it again, gives it a config that `twr relay check-config` refuses, and finally a release that crashes, which must roll back. It needs Docker and a twr with `twr relay`, so it isn't part of `check.sh`.
