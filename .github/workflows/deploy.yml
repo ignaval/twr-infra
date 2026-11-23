@@ -1,0 +1,108 @@
+# Deploy a signed twr release to the relay, one region at a time (docs/runbook.md, Deploy).
+#
+# Runs only by hand, in the protected environment relay-deploy (required reviewer: the
+# maintainer). The release's signature is checked here on the runner and again on each
+# Droplet. A region's probe must pass before the next region is touched.
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "twr release tag to deploy, for example v0.8.0"
+        required: true
+        type: string
+      regions:
+        description: "Regions, comma-separated, in deploy order"
+        required: true
+        default: "eu,us"
+        type: string
+
+permissions:
+  contents: read
+
+# Two deploys never overlap; a second one waits for the first instead of cancelling it.
+concurrency:
+  group: relay-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy ${{ inputs.version }} to ${{ inputs.regions }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: relay-deploy
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the inputs
+        env:
+          VERSION: ${{ inputs.version }}
+          REGIONS: ${{ inputs.regions }}
+        run: |
+          case "$VERSION" in
+            v[0-9]*) ;;
+            *) echo "::error::version must be a release tag such as v0.8.0, not '$VERSION'"; exit 1 ;;
+          esac
+          case "$VERSION" in
+            *[!A-Za-z0-9.+-]*) echo "::error::version has characters a release tag doesn't"; exit 1 ;;
+          esac
+          case "$REGIONS" in
+            "" | *[!a-z0-9,]*) echo "::error::regions is a comma-separated list such as eu,us"; exit 1 ;;
+          esac
+
+      # Download, check the Ed25519 signature, the release line and the checksum, keep the
+      # files for upload, and install this release's twr on the runner for the probes.
+      - name: Verify the release
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          sh scripts/install-twr-release.sh --tag "$VERSION" --arch x86_64 \
+            --key keys/twr-release-signing-key.pub \
+            --keep-dir "$RUNNER_TEMP/release" --dest "$RUNNER_TEMP/bin"
+          "$RUNNER_TEMP/bin/twr" --version
+
+      - name: Write the deploy key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          if [ -z "$DEPLOY_SSH_KEY" ]; then
+            echo "::error::the relay-deploy environment has no DEPLOY_SSH_KEY secret"
+            exit 1
+          fi
+          (umask 077 && printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key")
+
+      - name: Open SSH for this runner
+        env:
+          DO_FIREWALL_TOKEN: ${{ secrets.DO_FIREWALL_TOKEN }}
+          DO_FIREWALL_ID: ${{ vars.DO_FIREWALL_ID }}
+        run: sh scripts/do-firewall-ssh.sh open
+
+      - name: Deploy, one region at a time
+        env:
+          VERSION: ${{ inputs.version }}
+          REGIONS: ${{ inputs.regions }}
+          DEPLOY_SSH_KEY_FILE: ${{ runner.temp }}/deploy_key
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          ALERT_WEBHOOK_TOKEN: ${{ secrets.ALERT_WEBHOOK_TOKEN }}
+          ALERT_SMTP_URL: ${{ secrets.ALERT_SMTP_URL }}
+          ALERT_SMTP_USER: ${{ secrets.ALERT_SMTP_USER }}
+          ALERT_SMTP_PASSWORD: ${{ secrets.ALERT_SMTP_PASSWORD }}
+          ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+        run: |
+          sh scripts/deploy-regions.sh --tag "$VERSION" --regions "$REGIONS" \
+            --release-dir "$RUNNER_TEMP/release" --twr "$RUNNER_TEMP/bin/twr"
+
+      - name: Close SSH again
+        if: always()
+        env:
+          DO_FIREWALL_TOKEN: ${{ secrets.DO_FIREWALL_TOKEN }}
+          DO_FIREWALL_ID: ${{ vars.DO_FIREWALL_ID }}
+        run: sh scripts/do-firewall-ssh.sh close
+
+      - name: Remove the deploy key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/deploy_key"

@@ -1,0 +1,8 @@
+# Pinned SSH host keys of the relay Droplets, for the deploy workflow
+# (StrictHostKeyChecking=yes, never accept-new). Keyed by HostKeyAlias, not by name or IP:
+#   twr-relay-<region> <key type> <base64 key>
+# Fill in after each Droplet is created or replaced, from a source you trust (docs/runbook.md,
+# "Host keys"): never from an unauthenticated ssh-keyscan alone.
+#
+# twr-relay-eu ssh-ed25519 REPLACE_ME
+# twr-relay-us ssh-ed25519 REPLACE_ME

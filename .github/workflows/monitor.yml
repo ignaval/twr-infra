@@ -1,0 +1,66 @@
+# The outside check: probe every region from GitHub every 10 minutes, for when both regions
+# fail together (each Droplet probes the other region every minute; monitoring/).
+#
+# Alerts go through monitoring/alert.sh with the ALERT_* repository secrets (not the
+# relay-deploy environment's: an environment with a required reviewer would hold every run).
+# The probe uses the twr release named by the repository variable TWR_PROBE_VERSION.
+#
+# Cost: at about one billed minute per run this is ~4,300 Actions minutes a month, more than
+# a private repository's free allowance (README.md checklist, "Actions minutes"). Lower the
+# frequency if that matters.
+name: monitor
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read # gh run list: the previous run's conclusion is the alert state
+
+concurrency:
+  group: monitor
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: probe every region
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the probe's twr
+        id: install
+        continue-on-error: true
+        env:
+          VERSION: ${{ vars.TWR_PROBE_VERSION }}
+        run: |
+          if [ -z "$VERSION" ]; then
+            echo "::error::set the repository variable TWR_PROBE_VERSION to a twr release tag"
+            exit 1
+          fi
+          sh scripts/install-twr-release.sh --tag "$VERSION" --arch x86_64 \
+            --key keys/twr-release-signing-key.pub --dest "$RUNNER_TEMP/bin"
+
+      - name: Probe and alert
+        env:
+          INSTALL: ${{ steps.install.outcome }}
+          VERSION: ${{ vars.TWR_PROBE_VERSION }}
+          GH_TOKEN: ${{ github.token }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          ALERT_WEBHOOK_TOKEN: ${{ secrets.ALERT_WEBHOOK_TOKEN }}
+          ALERT_SMTP_URL: ${{ secrets.ALERT_SMTP_URL }}
+          ALERT_SMTP_USER: ${{ secrets.ALERT_SMTP_USER }}
+          ALERT_SMTP_PASSWORD: ${{ secrets.ALERT_SMTP_PASSWORD }}
+          ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+        run: |
+          if [ "$INSTALL" = success ]; then
+            sh scripts/monitor-external.sh --twr "$RUNNER_TEMP/bin/twr"
+          else
+            sh scripts/monitor-external.sh --no-twr "installing twr ${VERSION:-(TWR_PROBE_VERSION unset)} failed"
+          fi
