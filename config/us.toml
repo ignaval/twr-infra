@@ -1,0 +1,74 @@
+# relay.toml for twr's relay, region "us": DigitalOcean New York (nyc3).
+#
+# Installed as /etc/twr-relay/relay.toml by cloud-init (first boot) and by every deploy
+# (scripts/apply-release.sh). The keys are exactly those of twr's
+# crates/twr-relay/src/server/config.rs; the relay refuses unknown keys (deny_unknown_fields).
+#
+# Every value is written out, even where it equals the relay's built-in default, so that a
+# change of a limit is a reviewed change here and not a silent change in a twr release.
+# The limits are the version 1 defaults of docs/relay-protocol.md §11 (design report §11.3,
+# "Abuse limits"). scripts/check-files.py checks that no [limits] key is missing.
+
+[relay]
+hostname = "us.relay.twr.tools"
+region = "us"
+# Dual-stack: one IPv6 socket that also takes IPv4 (Linux default, net.ipv6.bindv6only = 0).
+listen = ["[::]:443"]
+state_dir = "/var/lib/twr-relay"
+# Counters for monitoring/local-check.sh. Loopback only: never set metrics_public here.
+metrics_listen = "127.0.0.1:9469"
+metrics_public = false
+# public_host, public_port: unset. The hostname is the public name, on port 443.
+# phone_suffixes: [] means [hostname], so phones use <hub>-<tag>.us.relay.twr.tools.
+phone_suffixes = []
+
+[tls]
+# Let's Encrypt with tls-alpn-01 on port 443; the account and certificates are cached in
+# state_dir. Nothing to create by hand. TCP 80 is not opened.
+mode = "acme"
+acme_contact = "mailto:relay-ops@twr.tools"
+acme_directory = "https://acme-v02.api.letsencrypt.org/directory"
+# For a test against Let's Encrypt staging, use (and remove again):
+# acme_directory = "https://acme-staging-v02.api.letsencrypt.org/directory"
+
+[iroh]
+enabled = true
+# Covered by the *.us.relay.twr.tools DNS records; the relay gets its certificate itself.
+hostname = "iroh.us.relay.twr.tools"
+# iroh's QUIC address discovery. Matches the UDP 7842 firewall rules (tofu/, cloud-init/).
+quic_listen = "[::]:7842"
+
+[limits]
+# Per hub
+phones_per_hub = 32
+phone_connections_per_hub = 8
+# 20 GB in any 30 days, both directions.
+monthly_bytes_per_hub = 20000000000
+# Per connection, each direction: 10 MB/s, bursts to 32 MB.
+bytes_per_second = 10000000
+burst_bytes = 32000000
+# Per connection: 10 minutes idle, 5 s to a complete ClientHello, 10 s to a valid hub hello.
+idle_seconds = 600
+hello_seconds = 5
+hub_hello_seconds = 10
+# Per source address (an IPv4 address, or an IPv6 /64)
+new_hubs_per_ip_per_hour = 10
+phone_attempts_per_ip_per_minute = 60
+pending_per_ip = 16
+record_puts_per_ip_per_minute = 60
+pairing_admissions_per_ip_per_hour = 10
+pair_admissions_per_ip_per_hour = 60
+# Global
+max_connections = 20000
+max_hubs = 50000
+max_records = 100000
+max_admitted = 200000
+# Record store: records expire 2 hours after they were stored.
+record_ttl_seconds = 7200
+
+[deny]
+# Abuse response (docs/runbook.md, "Abuse"). Each entry with a dated comment saying why.
+# hubs: hub names. endpoints: iroh endpoint ids (64 hex). addresses: IPs or CIDR prefixes.
+hubs = []
+endpoints = []
+addresses = []
