@@ -1,0 +1,10 @@
+[Unit]
+Description=twr relay monitoring: probe the other regions every minute
+
+[Timer]
+OnCalendar=minutely
+AccuracySec=1s
+Persistent=false
+
+[Install]
+WantedBy=timers.target

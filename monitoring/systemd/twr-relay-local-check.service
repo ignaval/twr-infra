@@ -1,0 +1,25 @@
+[Unit]
+Description=twr relay monitoring: service, certificate, disk and reboot checks
+Documentation=file:///usr/local/lib/twr-relay-monitor/local-check.sh
+After=twr-relay.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/twr-relay/monitor.env
+ExecStart=/usr/local/lib/twr-relay-monitor/local-check.sh
+TimeoutStartSec=60
+StateDirectory=twr-relay-monitor
+StateDirectoryMode=0700
+# Root, to read /etc/twr-relay/alert.env (0600) and ask systemd about twr-relay.service.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
