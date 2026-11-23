@@ -8,6 +8,25 @@ locals {
     )
   }
   ipv6 = { for r, _ in var.regions : r => digitalocean_droplet.relay[r].ipv6_address }
+
+  # Each Droplet's first-boot cloud-init. A local, so that `tofu console` can render it
+  # without state (scripts/check-cloud-init.sh checks it against cloud-init's schema).
+  user_data = {
+    for r, v in var.regions : r =>
+    templatefile("${path.module}/../cloud-init/relay.yaml.tftpl", {
+      region                = r
+      hostname              = local.hostnames[r]
+      reboot_time           = v.reboot_time
+      twr_version           = var.twr_version
+      acme_contact          = var.acme_contact
+      admin_user            = var.admin_user
+      admin_ssh_public_keys = var.admin_ssh_public_keys
+      deploy_ssh_public_key = var.deploy_ssh_public_key
+      install_script        = file("${path.module}/../scripts/install-twr-release.sh")
+      signing_key           = file("${path.module}/../keys/twr-release-signing-key.pub")
+      relay_config          = file("${path.module}/../config/${r}.toml")
+    })
+  }
 }
 
 resource "digitalocean_tag" "relay" {
@@ -39,19 +58,7 @@ resource "digitalocean_droplet" "relay" {
   ssh_keys   = [digitalocean_ssh_key.admin.fingerprint]
   tags       = [digitalocean_tag.relay.id, digitalocean_tag.region[each.key].id]
 
-  user_data = templatefile("${path.module}/../cloud-init/relay.yaml.tftpl", {
-    region                = each.key
-    hostname              = local.hostnames[each.key]
-    reboot_time           = each.value.reboot_time
-    twr_version           = var.twr_version
-    acme_contact          = var.acme_contact
-    admin_user            = var.admin_user
-    admin_ssh_public_keys = var.admin_ssh_public_keys
-    deploy_ssh_public_key = var.deploy_ssh_public_key
-    install_script        = file("${path.module}/../scripts/install-twr-release.sh")
-    signing_key           = file("${path.module}/../keys/twr-release-signing-key.pub")
-    relay_config          = file("${path.module}/../config/${each.key}.toml")
-  })
+  user_data = local.user_data[each.key]
 
   lifecycle {
     # user_data runs on the first boot only, and changing it (or the image) would destroy
@@ -132,7 +139,7 @@ resource "digitalocean_project" "relay" {
   description = "twr's public relay (managed by the twr-infra repository)"
   purpose     = "Service or API"
   environment = "Production"
-  resources   = concat(
+  resources = concat(
     [for d in digitalocean_droplet.relay : d.urn],
     [digitalocean_domain.relay.urn],
     [for ip in digitalocean_reserved_ip.relay : ip.urn],

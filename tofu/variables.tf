@@ -1,6 +1,6 @@
 variable "regions" {
   description = "Relay regions: the key is the region name (DNS label and relay.region), do_region the DigitalOcean region, reboot_time the UTC time unattended-upgrades may reboot at (stagger them)."
-  type        = map(object({
+  type = map(object({
     do_region   = string
     reboot_time = string
   }))

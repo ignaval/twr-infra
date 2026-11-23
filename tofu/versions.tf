@@ -1,16 +1,15 @@
 terraform {
-  # OpenTofu. Written for 1.10; nothing here needs a newer feature. Unverified against a real
-  # `tofu init`: this repository was written without network access to the registry.
+  # OpenTofu. Checked with 1.13.9 (fmt, init, validate, test); plan.yml pins that version.
+  # 1.8 is the oldest with mock providers, which tests/ uses.
   required_version = ">= 1.8.0"
 
   required_providers {
     digitalocean = {
       source = "digitalocean/digitalocean"
-      # Any 2.x from 2.40 on (2.40 has every resource used here: droplet, reserved_ip,
-      # firewall, domain, record, project, tag, ssh_key). Unverified which 2.x is current.
-      # The exact version is pinned by .terraform.lock.hcl: commit it after the first
-      # `tofu init` and review its changes like code.
-      version = "~> 2.40"
+      # 2.109.0 was current on 2026-11-23 and is what `tofu validate` and `tofu test` ran
+      # against. .terraform.lock.hcl pins it exactly (with hashes for every platform);
+      # `tofu init -upgrade` moves it, and the lock file's diff is reviewed like code.
+      version = "~> 2.109"
     }
   }
 

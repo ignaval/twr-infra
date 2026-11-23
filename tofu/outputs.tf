@@ -25,7 +25,7 @@ output "firewall_id" {
 
 output "delegation_ns_records" {
   description = "Add these to the parent zone (twr.tools) by hand, once. Not managed here."
-  value       = [
+  value = [
     for ns in ["ns1.digitalocean.com.", "ns2.digitalocean.com.", "ns3.digitalocean.com."] :
     "${var.relay_domain}. 3600 IN NS ${ns}"
   ]
