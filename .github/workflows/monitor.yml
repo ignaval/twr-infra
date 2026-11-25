@@ -5,9 +5,8 @@
 # relay-deploy environment's: an environment with a required reviewer would hold every run).
 # The probe uses the twr release named by the repository variable TWR_PROBE_VERSION.
 #
-# Cost: at about one billed minute per run this is ~4,300 Actions minutes a month, more than
-# a private repository's free allowance (README.md checklist, "Actions minutes"). Lower the
-# frequency if that matters.
+# Cost: about one minute per run, ~4,300 Actions minutes a month, free on this public
+# repository (README.md checklist, "Actions minutes").
 name: monitor
 
 on:

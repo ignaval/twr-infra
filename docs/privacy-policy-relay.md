@@ -8,7 +8,7 @@ That page currently says "the project runs no service that your data passes thro
 
 ## twr's relay
 
-The phone apps and hubs can reach each other through a relay when the phone can't reach the hub directly. twr's own relay runs in two places, `eu.relay.twr.tools` and `us.relay.twr.tools`. It is operated by [OPERATOR NAME], [OPERATOR ADDRESS], reachable at [CONTACT EMAIL, for example privacy@twr.tools].
+The phone apps and hubs can reach each other through a relay when the phone can't reach the hub directly. twr's own relay runs in two places, `eu.relay.twr.tools` and `us.relay.twr.tools`. It is operated by CGIS LLC, [OPERATOR ADDRESS], reachable at [CONTACT EMAIL, for example privacy@twr.tools].
 
 Your hub uses it by default (`[mobile] relay = "twr"`). Runners and hubs linked with `twr-link` may use it to find each other.
 
@@ -71,4 +71,4 @@ You can ask for access to, or deletion of, data about you at [CONTACT EMAIL]. Th
   - *App Store privacy label.* Does this count as "data collected" by the developer? Possibly under Identifiers or Diagnostics ("other diagnostic data"), and if so "not linked to the user's identity" and "not used for tracking". Apple's definitions say whether data that only passes through a server counts as collected. Read them.
   - *Google Play Data safety.* Possibly "Device or other IDs" or "App activity", collected, not shared, encrypted in transit, with deletion on request. Also check whether IP addresses count as "Approximate location" under Google's guidance.
   - Both forms must cover the default setting (`relay = "twr"`), not only what's possible when the relay is off.
-- **Operator.** Personal name or entity is your call. It decides `[OPERATOR NAME]`, the address and who answers requests.
+- **Operator.** CGIS LLC (decided 2026-11-25). Its postal address (`[OPERATOR ADDRESS]`) and the contact address (`[CONTACT EMAIL]`) are still to fill in.

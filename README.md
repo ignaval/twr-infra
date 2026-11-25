@@ -68,23 +68,23 @@ None of this exists yet, and I verified none of it. The repository works only af
 - [ ] A second token for the deploy workflow that can only read and update firewalls. It goes into the `relay-deploy` secret `DO_FIREWALL_TOKEN`. *Unverified* that a firewall-only custom scope exists.
 
 **DNS**
-- [ ] Find out where `twr.tools` DNS lives today. It is unknown. twr's `docs/development.md` says only that `twr.tools` is a Vercel project. Check the Vercel dashboard (Domains), `vercel domains inspect twr.tools`, or the registrar's panel.
-- [ ] After `tofu` has created the `relay.twr.tools` zone (never before: a delegation to an unclaimed DigitalOcean zone can be taken over), in the parent zone add three NS records for `relay.twr.tools` pointing at `ns1.digitalocean.com.`, `ns2.digitalocean.com.` and `ns3.digitalocean.com.`. This repository doesn't manage them. If Vercel hosts the zone, *unverified* that it allows NS records for a subdomain.
-- [ ] If the parent zone has a CAA record, make sure it allows `letsencrypt.org`. `relay.twr.tools` gets its own CAA records from `tofu/dns.tf`.
+- [x] Where `twr.tools` DNS lives: GoDaddy (registrar and DNS host, `ns73`/`ns74.domaincontrol.com`), looked up 2026-11-25. The site's records point at Vercel; mail is at Purelymail. Deploy guide, steps 5 and 16.
+- [ ] After `tofu` has created the `relay.twr.tools` zone (never before: a delegation to an unclaimed DigitalOcean zone can be taken over), in the parent zone add three NS records for `relay.twr.tools` pointing at `ns1.digitalocean.com.`, `ns2.digitalocean.com.` and `ns3.digitalocean.com.`. This repository doesn't manage them. GoDaddy's panel takes NS records for a subdomain (deploy guide, step 16).
+- [x] The parent zone has no CAA record (2026-11-25), so nothing to allow. `relay.twr.tools` gets its own CAA records from `tofu/dns.tf`.
 
 **Mail**
 - [ ] `relay-ops@twr.tools` as a mailbox or forward, like `security@twr.tools`. Let's Encrypt gets it as the ACME contact, and abuse reports will use it. You don't create a Let's Encrypt account by hand, because the relay registers itself.
 
 **GitHub**
-- [ ] A private repository for this one, for example `ignaval/twr-infra`. I created none and pushed nothing.
-- [ ] An environment `relay-deploy` limited to the `main` branch, with you as required reviewer. The reviewer is available only for a public repository, or a private one on Enterprise (deploy guide, 0.3). It holds these secrets:
+- [ ] A public repository for this one, `ignaval/twr-infra` (decided 2026-11-25, deploy guide 0.3). None is created and nothing is pushed yet.
+- [ ] An environment `relay-deploy` limited to the `main` branch, with you as required reviewer, which GitHub allows below Enterprise only because the repository is public (deploy guide, 0.3). It holds these secrets:
   - `DEPLOY_SSH_KEY`: the deploy user's private key (OpenSSH format, ed25519, no passphrase; a runner can't use a hardware key).
   - `DO_FIREWALL_TOKEN`: the firewall-only token above.
   - Alert routes, optional. If any is set, every deploy writes them to `/etc/twr-relay/alert.env`. They are `ALERT_WEBHOOK_URL`, `ALERT_WEBHOOK_TOKEN`, `ALERT_SMTP_URL`, `ALERT_SMTP_USER`, `ALERT_SMTP_PASSWORD`, `ALERT_EMAIL_FROM` and `ALERT_EMAIL_TO`.
 - [ ] Repository secrets with the same `ALERT_*` names for `monitor.yml`. Its runs can't use the environment, because a required reviewer would hold every run.
 - [ ] Repository variables `DO_FIREWALL_ID` (after the first apply) and `TWR_PROBE_VERSION` (the tag the monitor probes with).
 - [ ] Branch protection on `main`, with `plan` as a required check.
-- [ ] Actions minutes. `monitor.yml` every 10 minutes is about 4,300 billed minutes a month, over the free allowance of a private repository (2,000 on Free, 3,000 on Pro, *unverified* current numbers). Budget for it, or make it less frequent.
+- [x] Actions minutes. `monitor.yml` every 10 minutes is about 4,300 minutes a month, free on a public repository.
 
 **SSH keys**
 - [ ] An admin key, hardware-backed (`ssh-keygen -t ed25519-sk`), ideally with a second one as backup. Their public halves go into `admin_ssh_public_keys`.
@@ -95,7 +95,8 @@ None of this exists yet, and I verified none of it. The repository works only af
 - [ ] An alert destination, either a push topic or an address reachable through an SMTP relay. For ntfy, use a long random topic name or a protected topic with `ALERT_WEBHOOK_TOKEN`. The URL is effectively a password.
 
 **Privacy and stores**
-- [ ] Decide who operates the relay, you personally or an entity. That name replaces `[OPERATOR NAME]` in `docs/privacy-policy-relay.md`, and the contact placeholders need filling too.
+- [x] Decide who operates the relay: CGIS LLC (2026-11-25), now in `docs/privacy-policy-relay.md`.
+- [ ] Fill in the operator's postal address and the contact placeholders in `docs/privacy-policy-relay.md`.
 - [ ] Have a lawyer confirm the legal basis wording. Then merge the section into twr's `docs/privacy.md` before the relay serves anyone.
 - [ ] Update the App Store privacy label and the Play Data safety form (see the draft's last section).
 
@@ -105,12 +106,12 @@ Checked on 2026-11-23, offline: `tofu fmt`, `tofu validate` and `tofu test` with
 
 - The Droplet size slug `s-1vcpu-1gb` and the image slug `ubuntu-26-04-x64`. The deploy guide's step 2 checks both with the new token.
 - The token scopes the provider needs, and the scope of the firewall-rules endpoints (`POST` and `DELETE /v2/firewalls/<id>/rules`). DigitalOcean's docs don't say; the guide's steps 2 and 21 find out.
-- Where `twr.tools` DNS lives, and that its host takes NS records for `relay`. Vercel's docs list NS as "Delegate a subdomain"; its CLI documents no NS type.
+- That GoDaddy's DNS panel takes the three `relay` NS records as the deploy guide's step 16 says (its labels are from GoDaddy's help, not tried).
 - How DigitalOcean treats the `*.eu` wildcard records and the CAA value format.
 - That `api.ipify.org` gives the runner's egress address.
 - On a real Droplet: Ubuntu 26.04's `ssh.service` name, chrony through cloud-init's `ntp` module, and nftables' conntrack rules.
 - That `ubuntu-24.04` runners have shellcheck and PyYAML. They lack `cloud-init`, which `plan.yml` installs.
-- GitHub plans: required reviewers on an environment work in a private repository only on Enterprise. On Pro, a private repository gets environments, their secrets and branch rules, but no reviewer. The guide's 0.3 lays out the choice.
+- GitHub plans, from GitHub's docs only: below Enterprise, required reviewers on an environment work only in a public repository, which is why `twr-infra` is public (deploy guide, 0.3).
 
 ## Checks
 

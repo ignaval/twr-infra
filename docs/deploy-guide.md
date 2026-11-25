@@ -16,7 +16,9 @@ Paths are relative to the `twr-infra` repository (`~/projects/twr-infra`) unless
 
 ## 0. Before you start: three decisions and one release
 
-### 0.1 A twr release that contains `twr relay` [you]
+### 0.1 A twr release that contains `twr relay` [done]
+
+**Done 2026-11-25: v0.7.0** (<https://github.com/ignaval/twr/releases/tag/v0.7.0>) has `twr relay`, and passed the check below. Where this guide says `vX.Y.Z`, that's `v0.7.0` until a newer release.
 
 The Droplets install twr from a signed GitHub release of `ignaval/twr`, and the deploy and monitor workflows probe with one. v0.6.0, the current release, has no `twr relay`. So a release built from `twr/twr-relay` (merged, together with `twr/phone-pairing` if you want both) has to exist first.
 
@@ -32,32 +34,19 @@ twr relay --help        # lists serve, probe, url, check-config
 
 Below, `vX.Y.Z` means that tag.
 
-### 0.2 Who operates the relay [you]
+### 0.2 Who operates the relay [decided]
 
-You personally, or an entity. It goes into the privacy policy (step 12), and it decides whose name is on the DigitalOcean account and its invoices. Decide now, so the account is in the right name from the start.
+**CGIS LLC** (decided 2026-11-25). The DigitalOcean account and its invoices are in its name (step 1), and it is the operator in the privacy policy (step 12). Its postal address and the contact address are still to fill in.
 
-### 0.3 Private or public `twr-infra` [you]
+### 0.3 `twr-infra` is public [decided]
 
-You asked for a private repository with you as required reviewer on `relay-deploy`. GitHub doesn't offer that combination below Enterprise. From GitHub's docs (read 2026-11-23):
+**Public** (decided 2026-11-25). Steps 7 to 11 are written for a public repository. Why, from GitHub's docs (read 2026-11-23):
 
-- "If you are on a GitHub Free, GitHub Pro, or GitHub Team plan, required reviewers are only available for public repositories."
-- Environments, environment secrets and deployment-branch rules in a private repository need GitHub Pro or Team. On Free, a private repository gets none of them.
-- Branch protection on a private repository also needs Pro or Team.
-- Actions minutes: a public repository's are free. A private one pays for `monitor.yml`, about 4,300 minutes a month, which is more than the Free (2,000) or Pro (3,000) allowance.
+- "If you are on a GitHub Free, GitHub Pro, or GitHub Team plan, required reviewers are only available for public repositories." Public is the only way below Enterprise to have you approve every deploy on `relay-deploy`.
+- Environments, environment secrets, deployment-branch rules and branch protection all work on a public repository on any plan.
+- A public repository's Actions minutes are free, so `monitor.yml` (about 4,300 minutes a month) costs nothing.
 
-The options:
-
-| | Public repository | Private, GitHub Pro | Private, GitHub Free |
-|---|---|---|---|
-| Required reviewer on deploys | yes | **no** | no |
-| Environment secrets, deploy only from `main` | yes | yes | **no**: repository secrets only |
-| Branch protection | yes | yes | no |
-| `monitor.yml` minutes | free | about 1,300 over the allowance a month | about 2,300 over |
-| What's visible | configs, scripts, runbook, IPs (already public in DNS), host public keys | nothing | nothing |
-
-**My recommendation: public.** Nothing in the repository is secret: the tokens and keys live in GitHub secrets, and `check-files.py` refuses secrets in the tree. twr is open source, and the relay's addresses are in public DNS anyway. Public is also the only way below Enterprise to get the approval gate you asked for, and the monitoring is free. The cost is that anyone can read how the relay is run, which also lets people audit it.
-
-If you keep it private on Pro, the gate becomes "only people with write access can start `deploy`", and you are the only collaborator. That is weaker: a stolen GitHub session could deploy without a second click. Steps 9 and 10 say what changes for each choice.
+Nothing in the repository is secret: the tokens and keys live in GitHub secrets, and `check-files.py` refuses secrets in the tree. What anyone can read: the configs, scripts, runbook, the relay's IP addresses (public in DNS anyway) and the host public keys.
 
 ---
 
@@ -65,7 +54,7 @@ If you keep it private on Pro, the gate becomes "only people with write access c
 
 ### 1. Account, two-factor login, billing, a spend alert [you]
 
-1. Sign up at <https://cloud.digitalocean.com/registrations/new> with email and password, in the operator's name (0.2). Use a dedicated address such as `relay-ops@twr.tools` once it exists (step 5), or your own for now.
+1. Sign up at <https://cloud.digitalocean.com/registrations/new> with email and password, in CGIS LLC's name (0.2). Use a dedicated address such as `relay-ops@twr.tools` once it exists (step 5), or your own for now.
 2. Two-factor login: open <https://cloud.digitalocean.com/account/profile> (My Account), scroll to **Two-factor authentication**, click **Set Up 2FA**, and use an authenticator app or a security key. Store the backup codes in your password manager. If you signed up with Google or GitHub instead, DigitalOcean leaves 2FA to that provider: make sure it's on there.
 3. Billing: in the main menu, open **Billing** and add a payment method.
 4. Spend alert: **Billing** → **Spend alerts** tab → **Create alert**. Name it `twr-relay`, set the monthly budget to 25 USD and the thresholds to 50% and 100%, track **Total spend**, then **Create alert**. Two Droplets at 6 USD each come to about 12 USD a month. A spend alert doesn't cap spending.
@@ -160,12 +149,7 @@ Never create it inside the repository.
 
 Let's Encrypt gets this address as the ACME contact, and it is where expiry warnings and abuse reports arrive.
 
-1. See what handles `twr.tools` mail today:
-   ```sh
-   dig +short MX twr.tools
-   ```
-   - It prints mail servers: add `relay-ops@twr.tools` as an alias or forward in that provider, the same way `security@twr.tools` is set up.
-   - It prints nothing: `twr.tools` has no mail yet. Pick a forwarding service, or the registrar's email forwarding if it has one. It will tell you which MX and TXT (SPF) records to add, in the same DNS place as step 16. Forward `relay-ops@` to your inbox.
+1. `twr.tools` mail is at **Purelymail** (looked up 2026-11-25: `MX 10 mailserver.purelymail.com.`, SPF `include:_spf.purelymail.com`, DMARC `p=reject`). In Purelymail's panel, add `relay-ops@twr.tools` the way `security@twr.tools` is set up: an alias or routing rule to your inbox, or a mailbox of its own. No DNS change is needed: the domain's MX, SPF and DMARC records already cover any address at `twr.tools`. If it ever changes, `dig +short MX twr.tools` shows the provider.
 2. Turn on two-factor login at the mail provider.
 
 **Check:** a mail from another account to `relay-ops@twr.tools` arrives, and a reply from it doesn't land in the recipient's spam.
@@ -198,7 +182,7 @@ topic="twr-relay-$(openssl rand -hex 16)"; echo "https://ntfy.sh/$topic"
 
 ### 7. Create `ignaval/twr-infra` and push [you or thread]
 
-With your go-ahead, a thread can run this. Use `--public` or `--private` as you decided in 0.3.
+With your go-ahead, a thread can run this. The repository is public (0.3).
 
 ```sh
 cd ~/projects/twr-infra
@@ -208,18 +192,16 @@ gh repo create ignaval/twr-infra --public --source . --remote origin --push \
   --description "Operations for twr's public relay (relay.twr.tools)"
 ```
 
-**Check:** `gh repo view ignaval/twr-infra --json visibility,defaultBranchRef` shows your choice and `main`. On GitHub, Actions shows `plan` running, and it passes. Its `tofu` job downloads OpenTofu 1.13.9 and the provider, and its cloud-init step installs `cloud-init` on the runner, which was never run on a real runner.
+**Check:** `gh repo view ignaval/twr-infra --json visibility,defaultBranchRef` shows `PUBLIC` and `main`. On GitHub, Actions shows `plan` running, and it passes. Its `tofu` job downloads OpenTofu 1.13.9 and the provider, and its cloud-init step installs `cloud-init` on the runner, which was never run on a real runner.
 
 ### 8. Branch protection on `main` [you]
 
-Public, or private on Pro: **Settings** → **Branches** → **Add classic branch protection rule** (or **Rules** → **Rulesets** → **New branch ruleset**):
+**Settings** → **Branches** → **Add classic branch protection rule** (or **Rules** → **Rulesets** → **New branch ruleset**):
 
 - Branch name pattern: `main`.
 - **Require a pull request before merging** (no approvals needed if you're alone).
 - **Require status checks to pass**, and add `tofu fmt + validate + test (no credentials)` and `shellcheck + actionlint + file checks`. They're listed once `plan` has run (step 7).
 - **Do not allow bypassing the above settings**.
-
-On a private repository on Free this setting doesn't exist. Then keep to pull requests by habit.
 
 **Check:** `git push origin HEAD:main` with a trivial commit is refused.
 
@@ -227,11 +209,10 @@ On a private repository on Free this setting doesn't exist. Then keep to pull re
 
 **Settings** → **Environments** → **New environment** → name `relay-deploy` → **Configure environment**:
 
-- **Required reviewers** (public, or Enterprise): add yourself. Leave **Prevent self-review** off: you start the deploys, and with it on you couldn't approve your own. Then **Save protection rules**.
+- **Required reviewers**: add yourself. Leave **Prevent self-review** off: you start the deploys, and with it on you couldn't approve your own. Then **Save protection rules**.
 - **Deployment branches and tags** → **Selected branches and tags** → add `main`.
-- Private on Free has no environments. Then skip this step, put the step-10 environment secrets in the repository's secrets instead, and delete the `environment: relay-deploy` line in `.github/workflows/deploy.yml` (a thread can do that edit).
 
-**Check:** the environment page lists you as reviewer (where available) and `main` as the only branch.
+**Check:** the environment page lists you as reviewer and `main` as the only branch.
 
 ### 10. Secrets and variables, by name [you]
 
@@ -264,10 +245,9 @@ Then `rm -rf "$d"` (step 4). The private deploy key now exists only in GitHub.
 
 **Check:** `gh secret list --env relay-deploy -R ignaval/twr-infra` lists `DEPLOY_SSH_KEY` and `DO_FIREWALL_TOKEN`. `gh secret list -R ignaval/twr-infra` lists your `ALERT_*`. `gh variable list -R ignaval/twr-infra` lists `TWR_PROBE_VERSION`.
 
-### 11. Actions minutes [you]
+### 11. Actions minutes [nothing to do]
 
-- Public repository: nothing to do.
-- Private repository: **Settings** (your account or the org) → **Billing and plans** → set an Actions spending limit, or slow the monitor down. To slow it, change `*/10` to `*/30` in `.github/workflows/monitor.yml` (about 1,450 minutes a month) through a pull request; a thread can make that edit. The Droplets still probe each other every minute, so a slower GitHub check only delays the alert for the case where both regions fail together.
+The repository is public (0.3), so its Actions minutes are free, `monitor.yml` included.
 
 ---
 
@@ -279,7 +259,7 @@ Then `rm -rf "$d"` (step 4). The private deploy key now exists only in GitHub.
 
 | Placeholder | Fill in |
 |---|---|
-| `[OPERATOR NAME]` | the operator (0.2) |
+| `[OPERATOR NAME]` | done: `CGIS LLC` (0.2) |
 | `[OPERATOR ADDRESS]` | a postal address that takes legal mail |
 | `[CONTACT EMAIL, for example privacy@twr.tools]` and `[CONTACT EMAIL]` | for example `privacy@twr.tools`, set up as in step 5 |
 | `[COMMAND THAT PRINTS IT]` | the command that prints a hub's relay name. It's part of the hub side (`phone-pairing`'s client work), so ask that thread for the exact command once it lands. |
@@ -375,16 +355,12 @@ dig +short CAA relay.twr.tools @ns1.digitalocean.com    # 0 issue "letsencrypt.o
 
 ### 16. Delegate `relay.twr.tools` from the parent zone [you]
 
-1. Find where `twr.tools` DNS lives:
+1. `twr.tools` DNS is at **GoDaddy**, which is also its registrar (looked up 2026-11-25: `NS ns73.domaincontrol.com. ns74.domaincontrol.com.`, RDAP registrar `GoDaddy.com, LLC`, registered 2026-10-01, expires 2027-10-01). The website's records (`A` 216.150.1.1 and 216.150.16.1, `www` CNAME to `vercel-dns-016.com`) point at Vercel, but the zone itself is GoDaddy's, not Vercel DNS. Check it's still so before you start:
    ```sh
-   dig +short NS twr.tools
-   whois twr.tools | grep -iE 'registrar:|name server'
+   dig +short NS twr.tools        # ns73.domaincontrol.com. and ns74.domaincontrol.com.: GoDaddy
    ```
-   - `ns1.vercel-dns.com.` and `ns2.vercel-dns.com.` mean Vercel DNS: follow step 2a.
-   - Anything else means the registrar's or another DNS host's panel: follow step 2b.
-2. Add three NS records, name `relay`, values `ns1.digitalocean.com`, `ns2.digitalocean.com` and `ns3.digitalocean.com`, TTL 3600.
-   - **2a. Vercel:** team dashboard → **Domains** → `twr.tools` → **DNS Records**. For each server, set **Name** `relay`, **Type** `NS`, **Value** `ns1.digitalocean.com` (then ns2, ns3), **TTL** `3600`, then **Add**. Vercel's docs list `NS` under "Delegate a subdomain to other nameservers". The CLI documents no NS type, so use the dashboard.
-   - **2b. Registrar or another DNS host:** its DNS panel, same three records. Some panels want the name as `relay.twr.tools` and the value with a trailing dot.
+   If it prints `ns1.vercel-dns.com.`/`ns2.vercel-dns.com.` instead, the zone moved to Vercel: use its dashboard (**Domains** → `twr.tools` → **DNS Records**) with the same three records.
+2. In GoDaddy: sign in at <https://dcc.godaddy.com/> → **Domain Portfolio** → `twr.tools` → **DNS** → **DNS Records** → **Add New Record**. Add three records, one per server: **Type** `NS`, **Name** `relay`, **Value** `ns1.digitalocean.com` (then `ns2.digitalocean.com`, `ns3.digitalocean.com`), **TTL** 1 hour, then **Save**. GoDaddy's panel labels are *unverified* (read from its help pages' layout, not tried), and some versions offer **Add More Records** to enter all three at once. Leave GoDaddy's own `@` NS records alone.
 3. Don't touch any other record. No glue is needed: DigitalOcean's name servers aren't inside `relay.twr.tools`.
 
 **Check:** wait a few minutes. TTLs of earlier lookups can delay it by up to an hour.
@@ -398,7 +374,7 @@ dig +short SOA relay.twr.tools @1.1.1.1        # starts with ns1.digitalocean.co
 dig +trace NS relay.twr.tools | tail -6        # the last hop is a digitalocean.com server
 ```
 
-`CAA` on `twr.tools` doesn't matter: `relay.twr.tools` has its own, which Let's Encrypt finds first.
+`CAA` on `twr.tools` doesn't matter (it has none, 2026-11-25): `relay.twr.tools` has its own, which Let's Encrypt finds first.
 
 ### 17. Plan and apply everything [you]
 
