@@ -58,7 +58,7 @@ esac
 [ -d "$release_dir" ] || err "--release-dir $release_dir is not a directory"
 [ -x "$twr" ] || err "--twr $twr is not an executable"
 key=${DEPLOY_SSH_KEY_FILE:-}
-[ -n "$key" ] && [ -f "$key" ] || err "DEPLOY_SSH_KEY_FILE does not name the deploy key"
+if [ -z "$key" ] || [ ! -f "$key" ]; then err "DEPLOY_SSH_KEY_FILE does not name the deploy key"; fi
 known_hosts=${KNOWN_HOSTS:-$repo/known_hosts}
 [ -f "$known_hosts" ] || err "no known_hosts at $known_hosts"
 domain=${RELAY_DOMAIN:-relay.twr.tools}

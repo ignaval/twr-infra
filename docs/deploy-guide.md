@@ -20,7 +20,7 @@ Paths are relative to the `twr-infra` repository (`~/projects/twr-infra`) unless
 
 **Done 2026-11-25: v0.7.0** (<https://github.com/ignaval/twr/releases/tag/v0.7.0>) has `twr relay`, and passed the check below. Where this guide says `vX.Y.Z`, that's `v0.7.0` until a newer release.
 
-The Droplets install twr from a signed GitHub release of `ignaval/twr`, and the deploy and monitor workflows probe with one. v0.6.0, the current release, has no `twr relay`. So a release built from `twr/twr-relay` (merged, together with `twr/phone-pairing` if you want both) has to exist first.
+The Droplets install twr from a signed GitHub release of `ignaval/twr`, and the deploy and monitor workflows probe with one. v0.6.0 had no `twr relay`, so a release with it had to exist first: v0.7.0, cut from `dev` with #60 merged.
 
 1. Give the go-ahead to merge `twr/twr-relay` (it is based on `public/main`, so it goes to `ignaval/twr`'s `dev` by pull request; local `dev` is disjoint history and needs the public sync first). **[you]**, then **[thread]** for the merge work.
 2. Cut the release as `docs/development.md` → "Releases" says: version bump on `dev`, CI, PR `dev` → `main` with a merge commit, then push the tag `v<version>`. **[you]**: the PR merge and the tag push are yours.
@@ -535,7 +535,14 @@ systemctl list-timers 'twr-relay-*'          # peer-probe every minute, local-ch
 
 The test alert must reach your phone and/or inbox. Close SSH again afterwards.
 
-Run the outside monitor once by hand: **Actions** → **monitor** → **Run workflow**. It must pass. After that it runs every 10 minutes by itself.
+Turn on the outside monitor and run it once by hand. It was disabled when the repository was created (2026-11-25), so it wouldn't fail every 10 minutes before any relay existed:
+
+```sh
+gh workflow enable monitor -R ignaval/twr-infra
+gh workflow run monitor -R ignaval/twr-infra
+```
+
+It must pass (**Actions** → **monitor**). After that it runs every 10 minutes by itself.
 
 ### 24. Verification, the whole list [you]
 

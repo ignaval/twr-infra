@@ -162,7 +162,7 @@ say "$asset of $tag: signature and checksum verified"
 # 5. The binary.
 mkdir "$work/x"
 tar -xzf "$work/$asset" -C "$work/x" twr 2> /dev/null || err "$asset has no top-level twr"
-[ -f "$work/x/twr" ] && [ ! -L "$work/x/twr" ] || err "twr in $asset is not a regular file"
+if [ ! -f "$work/x/twr" ] || [ -L "$work/x/twr" ]; then err "twr in $asset is not a regular file"; fi
 
 if [ -n "$keep_dir" ]; then
     mkdir -p "$keep_dir" || err "could not create $keep_dir"
