@@ -117,7 +117,10 @@ send_mail() {
     esac
     from=${ALERT_EMAIL_FROM:-}
     to=${ALERT_EMAIL_TO:-}
-    [ -n "$from" ] && [ -n "$to" ] || { say "ALERT_EMAIL_FROM and ALERT_EMAIL_TO are needed for mail"; return 1; }
+    if [ -z "$from" ] || [ -z "$to" ]; then
+        say "ALERT_EMAIL_FROM and ALERT_EMAIL_TO are needed for mail"
+        return 1
+    fi
     for v in "$url" "$from" "$to" "${ALERT_SMTP_USER:-}" "${ALERT_SMTP_PASSWORD:-}" "$title"; do
         safe "$v" || { say "an alert setting holds a quote, backslash or newline; not sent"; return 1; }
     done
